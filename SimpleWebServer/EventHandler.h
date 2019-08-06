@@ -1,7 +1,7 @@
 /**************************/
 //此类为套接字事件处理基类，主要处理可读，可写及错误事件
 /**************************/
-//
+
 #ifndef EVENTHANDLER__
 #define EVENTHANDLER__
 #include <sys/epoll.h>
