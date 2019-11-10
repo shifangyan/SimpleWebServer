@@ -17,19 +17,19 @@ public:
 	typedef std::shared_ptr<Timer> sptr;
 private:
 	
-	uint64 when_; //åˆ°æœŸæ—¶é—´
+	uint64 when_; //µ½ÆÚÊ±¼ä
 	func callback_func_;
-	const uint32 interval_time_; //é—´éš”æ—¶é—´ 0ä»£è¡¨åªæ‰§è¡Œä¸€æ¬¡ å¦åˆ™ä»£è¡¨å¾ªç¯æ‰§è¡Œ
+	const uint32 interval_time_; //¼ä¸ôÊ±¼ä 0´ú±íÖ»Ö´ĞĞÒ»´Î ·ñÔò´ú±íÑ­»·Ö´ĞĞ
 	bool use_;
 	std::weak_ptr<TimerManager> timer_manager_;
 public:
 	Timer(uint32 interval_time,bool every,func callback_func,std::weak_ptr<TimerManager> sptr);
-	void Run(); //æ—¶é—´åˆ°æœŸçš„æ‰§è¡Œå‡½æ•° ä¼šè°ƒç”¨å›è°ƒå‡½æ•°ä»¥åŠæ˜¯å¦é‡æ–°è®¡æ—¶ç­‰æ“ä½œ
-	void SetInvalid() //å°†è¯¥å®šæ—¶å™¨æ ‡è®°ä¸ºä¸ä½¿ç”¨
+	void Run(); //Ê±¼äµ½ÆÚµÄÖ´ĞĞº¯Êı »áµ÷ÓÃ»Øµ÷º¯ÊıÒÔ¼°ÊÇ·ñÖØĞÂ¼ÆÊ±µÈ²Ù×÷
+	void SetInvalid() //½«¸Ã¶¨Ê±Æ÷±ê¼ÇÎª²»Ê¹ÓÃ
 	{
 		use_ = false;
 	}
-	void Reset(); //é‡æ–°è®¡æ—¶ åªåœ¨interval_time_ä¸ä¸º0æ—¶æ‰æ‰§è¡Œ
+	void Reset(); //ÖØĞÂ¼ÆÊ± Ö»ÔÚinterval_time_²»Îª0Ê±²ÅÖ´ĞĞ
 	uint64 GetTime()
 	{
 		return when_;

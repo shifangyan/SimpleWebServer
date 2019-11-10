@@ -1,5 +1,5 @@
 /******************* */
-//姝ょ被瀹炵幇http鐨勮姹傚拰鍥炲簲
+//此类实现http的请求和回应
 /********************* */
 
 #ifndef HTTPSERVEREVENTHANDLER__
@@ -8,9 +8,11 @@
 #include <map>
 #include <memory>
 #include <pthread.h>
-#include "EventHandler.h"
 #include "Timer.h"
+#include "Channel.h"
+//#include "HttpServer.h"
 
+class HttpServer;
 enum HttpState
 {
     STATE_WAIT_REQUEST,
@@ -62,6 +64,13 @@ enum AnalysisState
     STATE_ANALYSIS_ERROR,
     STATE_ANALYSIS_SUCCESS
 };
+
+enum ConnectState
+{
+	STATE_CONNECTING,
+	STATE_DISCONNECTING,
+	STATE_DISCONNECTED
+};
 class FileType:public NonCopy
 {
 private:
@@ -86,10 +95,16 @@ public:
     }
 };
 //class Epoll;
-class HttpServerEventHandler:public EventHandler
+class HttpConnection:public NonCopy
 {
+public:
+	typedef Channel::Channel_SPtr Channel_SPtr;
+	typedef Channel::EventLoop_WPtr EventLoop_WPtr;
 private:
-    static const int kLongLinkTime; //鍗曚綅涓虹
+	const int fd_;
+	Channel_SPtr channel_sptr_;
+    static const int kLongLinkTime; //单位为秒
+	//EventLoop_WPtr event_loop_wptr_;
     std::string in_buff_;
     std::string out_buff_;
     HttpState http_state_;
@@ -107,20 +122,36 @@ private:
     bool have_body_;
     bool is_close_;
     bool keep_alive_;
+	ConnectState connect_state_;
+	HttpServer *http_server_;
     void ParseRequestLine();
     void ParseHeader();
     void ParseBody();
     void AnalysisRequest();
     void Init();
     void HttpError();
+	void WriteData();
 public:
     //typedef std::weak_ptr<EventLoop> wptr;
     //typedef std::shared_ptr<EventLoop> sptr;
-    HttpServerEventHandler(int fd,EventLoop_WPtr event_loop);
-    virtual void WriteHandle() override;
-    virtual void ReadHandle() override;
-    virtual void ErrorHandle() override;
-    virtual void CloseHandle() override;
+	HttpConnection(int fd,HttpServer *http_server);
+	~HttpConnection();
+    void WriteHandle();
+    void ReadHandle();
+    //void ErrorHandle();
+    //void CloseHandle();
+	void ActiveClose();
+	void PassiveClose();
     void TimeHandler();
+
+	Channel_SPtr channel()
+	{
+		return channel_sptr_;
+	}
+
+	const int fd()
+	{
+		return fd_;
+	}
 };
 #endif

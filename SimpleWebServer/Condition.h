@@ -1,6 +1,6 @@
 
 /***********************/
-//æ­¤ç±»å°è£…çº¿ç¨‹çš„æ¡ä»¶å˜é‡
+//´ËÀà·â×°Ïß³ÌµÄÌõ¼ş±äÁ¿
 /***********************/
 
 #ifndef CONDITION__
@@ -19,7 +19,7 @@ public:
     Condition(Mutex &mutex);
     ~Condition();
     void Wait();
-    //void TimeWait()
+	void TimeWait(unsigned int wait_seconds); //Ö»Ö§³ÖÃë¼¶¾«¶È
     void Signal();
     void SignalAll();
 };

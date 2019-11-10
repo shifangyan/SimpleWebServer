@@ -1,5 +1,5 @@
 /************************************** */
-//æ­¤ç±»ä¸ºepolläº‹ä»¶å¾ªç¯ç±»,æ¯æ¬¡å¾ªç¯éœ€è¦å¤„ç†å¥—æ¥å­—äº‹ä»¶ï¼Œæ—¶é—´äº‹ä»¶
+//´ËÀàÎªepollÊÂ¼şÑ­»·Àà,Ã¿´ÎÑ­»·ĞèÒª´¦ÀíÌ×½Ó×ÖÊÂ¼ş£¬Ê±¼äÊÂ¼ş
 /************************************** */
 
 #ifndef EVENTLOOP__
@@ -9,13 +9,13 @@
 #include <memory>
 #include <signal.h>
 #include "NonCopy.h"
-#include "NotifyEventHandler.h"
+#include "NotifyEvent.h"
 #include "Epoll.h"
 #include "Mutex.h"
-#include "EventHandler.h"
-#include "TimerManager.h"
 #include "Timer.h"
+#include "Channel.h"
 
+class TimerManager;
 class IgnoreSigPipe
 {
  public:
@@ -29,59 +29,49 @@ class IgnoreSigPipe
 class EventLoop:public NonCopy,public std::enable_shared_from_this<EventLoop>
 {
 public:
-    typedef EventHandler::EventHandler_WPtr EventHandler_WPtr;
-    typedef EventHandler::EventHandler_SPtr EventHandler_SPtr;
-    typedef EventHandler::EventLoop_WPtr EventLoop_WPtr;
-    typedef EventHandler::EventLoop_SPtr EventLoop_SPtr;
+	typedef std::shared_ptr<EventLoop> EventLoop_SPtr;
+	typedef std::weak_ptr<EventLoop> EventLoop_WPtr;
+	typedef Channel::Channel_SPtr Channel_SPtr;
+	typedef Channel::Channel_WPtr Channel_WPtr;
+	
 private:
     Epoll epoll_;
     //Thread *thread_ptr_;
     bool is_quit_;
     Mutex mutex_;
-    std::queue<EventHandler_SPtr> new_handler_queue_;
-    std::shared_ptr<NotifyEventHandler> notify_handler_ptr_;
+    std::queue<Channel_WPtr> new_channel_queue_;
+    NotifyEvent notify_event_;
     std::shared_ptr<TimerManager> timer_manager_;
    
 public:
     EventLoop();
     void Init();
     void Loop();
-    void NewEventHandler();
+    void NewConnectHandler();
+	void AddNewChannel(Channel_WPtr channel_wptr);
     inline void WakeUp()
     {
-        notify_handler_ptr_->EnableWrite();
-        //notify_handler_ptr_->WriteHandle();
+		notify_event_.WriteHandle();
     }
     inline void Quit()
     {
         printf("Quit\n");
+		LOG_INFO << "Quit eventloop";
         is_quit_ = true;
         WakeUp();
     }
-    void AddNewHandler(EventHandler_SPtr &event_ptr);
-    // Epoll &GetEpoll()
-    // {
-    //     return epoll_;
-    // }
-    void UpdateEventHandlerForNew(EventHandler_SPtr &sh_ptr)
+    void UpdateChannelEvent(Channel_WPtr channel_wptr,bool new_channel)
     {
-        epoll_.UpdateEventHandlerForNew(sh_ptr);
+		if (new_channel)
+			epoll_.AddNewChannel(channel_wptr);
+		else
+			epoll_.UpdateChannelEvent(channel_wptr);
     }
-    void UpdateEventHandler(EventHandler_SPtr &sh_ptr)
+    void DelChannel(Channel_WPtr channel_wptr)
     {
-        epoll_.UpdateEventHandler(sh_ptr);
+        epoll_.DelChannel(channel_wptr);
     }
-    void DelEventHandler(EventHandler_SPtr &sh_ptr)
-    {
-        epoll_.DelEventHandler(sh_ptr);
-    }
-    std::weak_ptr<TimerManager> GetTimerManager()
-    {
-        return std::weak_ptr<TimerManager>(timer_manager_);
-    }
-    void AddTimer(std::weak_ptr<Timer> timer)
-    {
-        timer_manager_->AddTimer(timer);
-    }
+	std::weak_ptr<TimerManager> GetTimerManager();
+	void AddTimer(std::weak_ptr<Timer> timer);
 };
 #endif

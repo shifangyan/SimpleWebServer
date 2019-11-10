@@ -1,6 +1,8 @@
 #include "TimerManager.h"
 #include <sys/time.h>
 #include <stdio.h>
+#include <sys/timerfd.h>
+#include <fcntl.h>
 
 uint64 GetTimeOfNow()
 {
@@ -10,6 +12,17 @@ uint64 GetTimeOfNow()
     uint64 time_ms = tv.tv_sec*1000+tv.tv_usec/1000;
     return time_ms;
 }
+
+//int TimerCreate()
+//{
+//	int fd = timerfd_create(CLOCK_REALTIME, O_NONBLOCK);
+//	if (fd < 0)
+//	{
+//		LOG_ERROR << "create timer fd error";
+//		exit(0);
+//	}
+//	return fd;
+//}
 
 void TimerManager::DoTimeEvent()
 {

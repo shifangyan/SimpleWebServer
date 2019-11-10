@@ -10,11 +10,11 @@
 #include "Util.h"
 
 const int LISTENQ = 1000;
-int Readn(int fd,void *buff,size_t n)
+size_t Readn(int fd,void *buff,size_t n)
 {
   //  printf("go there Readn start\n");
     size_t nleft = n;
-    int nread = 0;
+    ssize_t nread = 0;
     size_t read_sum = 0;
     char *ptr = (char *)buff;
     while(nleft >0)
@@ -22,23 +22,23 @@ int Readn(int fd,void *buff,size_t n)
         if((nread = read(fd,ptr,nleft)) < 0)
         {
           //  printf("%d\n",nread);
-            if(errno == EINTR) //è¢«ç³»ç»Ÿä¸­æ–­æ‰“æ–­
+            if(errno == EINTR) //±»ÏµÍ³ÖÐ¶Ï´ò¶Ï
             {
                // printf("??????\n");
-                nread = 0; //ç»§ç»­è¯»
+                nread = 0; //¼ÌÐø¶Á
             }
-            else if(errno == EAGAIN) //å¥—æŽ¥å­—ç¼“å­˜åŒºè¢«è¯»ç©º
+            else if(errno == EAGAIN) //Ì×½Ó×Ö»º´æÇø±»¶Á¿Õ
             {
                // printf("/////////\n");
-                return read_sum; //ç›´æŽ¥è¿”å›ž
+                return read_sum; //Ö±½Ó·µ»Ø
             }
-            else //æœªçŸ¥æƒ…å†µ è§†ä¸ºå‡ºé”™
+            else //Î´ÖªÇé¿ö ÊÓÎª³ö´í
             {
               //  printf("!!!!!!!!\n");
                 return -1;
             }
         }
-        else if(nread == 0) //å¯¹ç«¯å…³é—­ ä¸å¤„ç†
+        else if(nread == 0) //¶Ô¶Ë¹Ø±Õ ²»´¦Àí
         {
          //   printf("hhhhhh\n");
             break;
@@ -53,62 +53,62 @@ int Readn(int fd,void *buff,size_t n)
     return read_sum;
 }
 
-int Readn(int fd,std::string &str)
+size_t Readn(int fd,std::string &str)
 {
-    int nread = 0;
-    int read_sum = 0;
+    ssize_t nread = 0;
+    size_t read_sum = 0;
     while(1)
     {
     //    printf("readn\n");
         char buff[1000];
         if((nread = read(fd,buff,1000)) < 0)
         {
-            if(errno == EINTR) //è¢«ç³»ç»Ÿä¸­æ–­æ‰“æ–­
+            if(errno == EINTR) //±»ÏµÍ³ÖÐ¶Ï´ò¶Ï
             {
                // printf("??????\n");
-                nread = 0; //ç»§ç»­è¯»
+                nread = 0; //¼ÌÐø¶Á
             }
-            else if(errno == EAGAIN) //å¥—æŽ¥å­—ç¼“å­˜åŒºè¢«è¯»ç©º
+            else if(errno == EAGAIN) //Ì×½Ó×Ö»º´æÇø±»¶Á¿Õ
             {
                // printf("/////////\n");
-                return read_sum; //ç›´æŽ¥è¿”å›ž
+                return read_sum; //Ö±½Ó·µ»Ø
             }
-            else //æœªçŸ¥æƒ…å†µ è§†ä¸ºå‡ºé”™
+            else //Î´ÖªÇé¿ö ÊÓÎª³ö´í
             {
               //  printf("!!!!!!!!\n");
                 return -1;
             }
         }
-        else if(nread == 0) //å¯¹ç«¯å…³é—­ ä¸å¤„ç†
+        else if(nread == 0) //¶Ô¶Ë¹Ø±Õ ²»´¦Àí
         {    
          //   printf("readn1\n");
-            return read_sum; //æ³¨æ„å¦‚æžœè¯»åˆ°EOFï¼Œä¼šè¿”å›ž0ï¼Œä¸”ä¸‹æ¬¡è¯»è¿˜ä¼šè¿”å›ž0ï¼Œä¸ä¼šå‡ºçŽ°EAGAIN
+            return read_sum; //×¢ÒâÈç¹û¶Áµ½EOF£¬»á·µ»Ø0£¬ÇÒÏÂ´Î¶Á»¹»á·µ»Ø0£¬²»»á³öÏÖEAGAIN
         }
         read_sum += nread;
         str += std::string(buff,buff+nread);
     }
 }
 
-int Writen(int fd,void *buff,size_t n)
+size_t Writen(int fd,void *buff,size_t n)
 {
    // printf("go there Write start\n");
     size_t nleft = n;
-    int nwritten = 0;
+    ssize_t nwritten = 0;
     size_t written_sum = 0;
     char *ptr = static_cast<char *>(buff);
     while(nleft >0)
     {
         if((nwritten = write(fd,ptr,nleft)) <0)
         {
-            if(errno == EINTR)//è¢«ç³»ç»Ÿä¸­æ–­æ‰“æ–­
+            if(errno == EINTR)//±»ÏµÍ³ÖÐ¶Ï´ò¶Ï
             {
-                nwritten = 0; //ç»§ç»­å†™
+                nwritten = 0; //¼ÌÐøÐ´
             }
-            else if(errno == EAGAIN) //ç¼“å­˜åŒºè¢«å†™æ»¡
+            else if(errno == EAGAIN) //»º´æÇø±»Ð´Âú
             {
                 return written_sum;
             }
-            else //æœªçŸ¥æƒ…å†µ è§†ä¸ºå‡ºé”™
+            else //Î´ÖªÇé¿ö ÊÓÎª³ö´í
             {
                 return -1;
             }
@@ -121,26 +121,26 @@ int Writen(int fd,void *buff,size_t n)
     return written_sum;
 }
 
-int Writen(int fd,std::string &str)
+size_t Writen(int fd,std::string &str)
 {
    // printf("go there Write start\n");
     size_t nleft = str.size();
-    int nwritten = 0;
+    ssize_t nwritten = 0;
     size_t written_sum = 0;
     const char *ptr = str.c_str();
     while(nleft >0)
     {
         if((nwritten = write(fd,ptr,nleft)) <0)
         {
-            if(errno == EINTR)//è¢«ç³»ç»Ÿä¸­æ–­æ‰“æ–­
+            if(errno == EINTR)//±»ÏµÍ³ÖÐ¶Ï´ò¶Ï
             {
-                nwritten = 0; //ç»§ç»­å†™
+                nwritten = 0; //¼ÌÐøÐ´
             }
-            else if(errno == EAGAIN) //ç¼“å­˜åŒºè¢«å†™æ»¡
+            else if(errno == EAGAIN) //»º´æÇø±»Ð´Âú
             {
                 return written_sum;
             }
-            else //æœªçŸ¥æƒ…å†µ è§†ä¸ºå‡ºé”™
+            else //Î´ÖªÇé¿ö ÊÓÎª³ö´í
             {
                 return -1;
             }
@@ -153,7 +153,7 @@ int Writen(int fd,std::string &str)
     return written_sum;
 }
 
-int socket_bind_listen(int port,bool NonBlocking)
+int socket_bind_listen(unsigned short port,bool NonBlocking)
 {
   //  printf("go there socket_bind_listen start\n");
     int listenfd;

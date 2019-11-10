@@ -2,63 +2,138 @@
 #define LOGSTREAM__
 #include <string>
 #include <functional>
-
-using namespace std;
+#include <cstring>
+#include <algorithm>
+#include "NonCopy.h"
 
 template <size_t N>
 class Buffer
 {
 public:
-	Buffer():len_(sizeof(data_),cur_len_(0)
+	Buffer():cur_(data_)
 	{
-		memset(data_, len_, 0);
+		memset(data_,0, N);
 	}
-	void Append(char *str, int len)
+	Buffer(const Buffer &buffer)
 	{
-		if (len_ - cur_len_ >= len) //æ—¥å¿—å¤ªé•¿ ä¼šæ‹’ç»å†™å…¥
+		printf("???????????\n");
+	}
+	void Append(const char *str, int len)
+	{
+		if (Avail() >= len) //ÈÕÖ¾Ì«³¤ »á¾Ü¾øĞ´Èë
 		{
-			memcopy(data_ + cur_len_, str, len);
-			cur_len_ += len;
+			memcpy(cur_, str, len);
+			cur_ += len;
 		}
 	}
 	
-	const char *data() const
+	char *Data() 
 	{
 		return data_;
 	}
 
-	int length() const
+	char *Current()
 	{
-		return cur_len_;
+		return cur_;
+	}
+	int Length() const
+	{
+		//printf("%p  %p", &data_,cur_);
+		return static_cast<int>(cur_-data_);
 	}
 
+	int Avail()
+	{
+		return static_cast<int>(data_ + N - cur_);
+	}
+	void Add(int len)
+	{
+		cur_ += len;
+	}
 	void Clear()
 	{
-		cur_len_ = 0;
+		cur_= data_;
+	}
+	void InitZero()
+	{
+		memset(data_, 0, N);
 	}
 private:
 	char data_[N];
-	int cur_len_;
-	int len_;
+	char * cur_;
 };
 
-class LogStream
+class LogStream:public NonCopy
 {
 public:
-	typedef function<void(char *log, int len)> WriteLogFunc;
+	typedef std::function<void(char *log, int len)> WriteLogFunc;
+	typedef Buffer<1024> SmallBuffer;
 public:
-	LogStream():buffer_(1024,'';
-	~LogStream();
+	LogStream() :buffer_() {}
 	/*void SetWriteLogFunc(WriteLogFunc func)
 	{
 		func_ = func;
 	}*/
 
+	LogStream & operator<<(const char *str);
+	LogStream & operator<<(std::string &str);
+	LogStream & operator<<(bool b);
+	LogStream & operator<<(short n);
+	LogStream & operator<<(unsigned short n);
+	LogStream & operator<<(int n);
+	LogStream & operator<<(unsigned int n);
+	LogStream & operator<<(long n);
+	LogStream & operator<<(unsigned long n);
+	LogStream & operator<<(long long n);
+	LogStream & operator<<(unsigned long long n);
+	LogStream & operator<<(float n);
+	LogStream & operator<<(double n);
+	
+	template <typename T>
+	void Convert(T n);
 
+	SmallBuffer &GetBuffer()
+	{
+		return buffer_;
+	}
 private:
-	Buffer<1024> buffer_; //å›ºå®š1KBï¼Œä¸€æ¡æ—¥å¿—ï¼ˆåŒ…æ‹¬é™„åŠ ä¿¡æ¯ï¼‰ä¸èƒ½å¤§äº1KB å¦åˆ™ä¼šå¿½è§†è¯¥æ—¥å¿—ï¼Œä¸€æ¡1KBçš„æ—¥å¿—ä¹Ÿå¤ªå¤§äº†
+	SmallBuffer buffer_; //¹Ì¶¨1KB£¬Ò»ÌõÈÕÖ¾£¨°üÀ¨¸½¼ÓĞÅÏ¢£©²»ÄÜ´óÓÚ1KB ·ñÔò»áºöÊÓ¸ÃÈÕÖ¾£¬Ò»Ìõ1KBµÄÈÕÖ¾Ò²Ì«´óÁË
+	static const int kMaxNumericSize = 32;
 	/*WriteLogFunc func_;*/
 };
 
+template <typename T>
+void LogStream::Convert(T n)
+{
+	if (buffer_.Avail() >= kMaxNumericSize)
+	{
+		static const char num2char[19] = { '9','8','7','6','5','4','3','2','1','0','1','2','3','4','5','6','7','8','9' };
+		const char *zero = num2char + 9;
+		char *p, *cur;
+		p = cur = buffer_.Current();
+		T temp = n;
+		do
+		{
+			*p++ = zero[temp % 10];
+			temp = temp / 10;
+		} while (temp != 0); //µ±n=0Ê±Ò²ÄÜÕı³£Ö´ĞĞ
+		if (n < 0)
+			*p++ = '-';
+		*p = '\0';
+		std::reverse(cur, p);
+		buffer_.Add(p - cur);
+		//printf("%d\n", buffer_.Length());
+	}
+}
+
+template <>
+inline void LogStream::Convert(double n)
+{
+	if (buffer_.Avail() >= kMaxNumericSize)
+	{
+		int len = snprintf(buffer_.Current(), kMaxNumericSize, "%.12g", n);
+		buffer_.Add(len);
+	}
+}
 #endif
 

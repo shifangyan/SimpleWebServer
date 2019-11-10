@@ -1,20 +1,17 @@
-//epoll鐗堟湰echo server
 
-#include <sys/types.h>
-//#include "../writenReadn.h"
-#include <unistd.h>
-#include <errno.h>
-//#include "Epoll.h"
-//#include "ListenEventHandler.h"
-//#include "Util.h"
-#include "Server.h"
-#include <iostream>
+//#include <sys/types.h>
+//#include <unistd.h>
+//#include <errno.h>
+#include "HttpServer.h"
+//#include <iostream>
+#include "Logger.h"
+
 const int SERVER_PORT = 9000;
 
 int main(int argc,char *argv[])
 {
-	Server server(SERVER_PORT,4); //绔彛 绾跨▼鏁伴噺
+	LOG_DEBUG << "start main";
+	HttpServer server(SERVER_PORT, 4, "log_test", 3); //端口 线程数量
 	server.Run();
-	printf("go there\n");
 }
 

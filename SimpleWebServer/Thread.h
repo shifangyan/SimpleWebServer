@@ -1,5 +1,5 @@
 /***********************/
-//æ­¤ç±»å®ç°çº¿ç¨‹çš„å°è£…
+//´ËÀàÊµÏÖÏß³ÌµÄ·â×°
 /**********************/
 
 #ifndef THREAD__
@@ -10,33 +10,43 @@
 #include <memory>
 #include <functional>
 #include "NonCopy.h"
-#include "EventHandler.h"
 #include "EventLoop.h"
 
-struct ThreadData
-{
-    typedef std::function<void()> func;
-    func thread_function_; 
-    ThreadData(func thread_function):thread_function_(thread_function) {}
-};
+
+
 class Thread:public NonCopy
 {
+public:
+	typedef std::function<void()> ThreadFunction;
 private:
+	struct ThreadData
+	{
+		typedef std::function<void()> func;
+		ThreadFunction thread_function_;
+		ThreadData(ThreadFunction thread_function) :thread_function_(thread_function) {}
+	};
     //bool is_exit_;
     //bool is_detach_;
     //bool is_start_;
     pthread_t thread_id_;
-    pid_t pid_;
+    //pid_t pid_;
     //Mutex mutex_;
    // EventLoop event_loop_;
     ThreadData thread_data_;
-    static void *ThreadFunction(void *p);
+	
+    static void *ThreadRunning(void *p);
 public:
-    Thread(const std::shared_ptr<EventLoop> &event_loop);
+    //Thread(const std::shared_ptr<EventLoop> &event_loop);
+	Thread(ThreadFunction func);
     pthread_t GetThreadID() const
     {
         return thread_id_;
     }
+
+	void join()
+	{
+		pthread_join(thread_id_,NULL);
+	}
     //void Start();
     //inline int NewHandlerNum();
     //std::shared_ptr<EventHandler> GetNewHandler();

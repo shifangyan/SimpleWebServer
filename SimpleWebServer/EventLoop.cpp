@@ -1,54 +1,56 @@
 #include <functional>
 #include "EventLoop.h"
 #include "Epoll.h"
+#include "Logger.h"
+#include "Channel.h"
+#include "TimerManager.h"
 
 IgnoreSigPipe initObj;
 
-EventLoop::EventLoop():epoll_(),is_quit_(false),mutex_(),new_handler_queue_(),
-notify_handler_ptr_(),timer_manager_(new TimerManager)
+EventLoop::EventLoop():epoll_(),is_quit_(false),mutex_(), new_channel_queue_(),
+notify_event_(std::bind(&EventLoop::NewConnectHandler,this)),timer_manager_(new TimerManager)
 {
 }
 
 void EventLoop::Init()
 {
-	notify_handler_ptr_ = std::shared_ptr<NotifyEventHandler>(new NotifyEventHandler(EventLoop_WPtr(shared_from_this()),std::bind(&EventLoop::NewEventHandler,this)));
-	notify_handler_ptr_->EnableRead();
+	notify_event_.SetEventLoop(shared_from_this());
+	notify_event_.EnableRead();
 }
 void EventLoop::Loop()
 {
     while(!is_quit_)
 	{
+		
+		//LOG_INFO << "eventloop num:" << i++;
 		//printf("go there2-1\n");
 		uint64 nearest_time = timer_manager_->GetNearestTime();
 		if(nearest_time == 0)
-			nearest_time = 10; //é»˜è®¤10ms
+			nearest_time = -1; //Ä¬ÈÏÓÀ¾ÃµÈ´ýÊ±¼ä
 		else
 			nearest_time = nearest_time - GetTimeOfNow();
 		//uint64 start_t = GetTimeOfNow();
-		//èŽ·å–æ´»è·ƒå¥—æŽ¥å­—
-		epoll_.GetActiveEvents(nearest_time);
-		//uint64 end_t = GetTimeOfNow();
-		//printf("%d\n",end_t-start_t);
-		//printf("go there2\n");
-		//å¤„ç†å¥—æŽ¥å­—äº‹ä»¶
-		epoll_.DoActiveEvents();
-
-		//å¤„ç†æ—¶é—´äº‹ä»¶
+		//»ñÈ¡»îÔ¾Ì×½Ó×Ö
+		epoll_.HandlerActiveEvents(nearest_time);
+		//´¦ÀíÊ±¼äÊÂ¼þ
 		timer_manager_->DoTimeEvent();
 	//	printf("go there3\n");
 	}
 	printf("close server\n");
 }
 
-void EventLoop::NewEventHandler()
+void EventLoop::NewConnectHandler()
 {
+	LOG_DEBUG << "NewConnectHandler";
     MutexGuard mutex_guard(mutex_);
-    int n = new_handler_queue_.size();
+    int n = new_channel_queue_.size();
     for(int i = 0;i < n;i++)
     {
-        EventHandler_SPtr new_handler = new_handler_queue_.front();
-        new_handler_queue_.pop();
-        new_handler->EnableRead();
+		Channel_WPtr new_channel = new_channel_queue_.front();
+		new_channel_queue_.pop();
+		auto channel_sptr = new_channel.lock();
+		if(channel_sptr)
+			channel_sptr->EnableRead();
     }
 }
 
@@ -57,11 +59,21 @@ void EventLoop::NewEventHandler()
 
 //inline void EventLoop::Quit()
 
-void EventLoop::AddNewHandler(EventHandler_SPtr &event_ptr)
+void EventLoop::AddNewChannel(Channel_WPtr channel)
 {
+	LOG_DEBUG << "AddNewChannel";
     MutexGuard mutex_guard(mutex_);
-    new_handler_queue_.push(event_ptr);
+	new_channel_queue_.push(channel);
     WakeUp();
+}
+
+std::weak_ptr<TimerManager> EventLoop::GetTimerManager()
+{
+	return std::weak_ptr<TimerManager>(timer_manager_);
+}
+void EventLoop::AddTimer(std::weak_ptr<Timer> timer)
+{
+	timer_manager_->AddTimer(timer);
 }
 
 

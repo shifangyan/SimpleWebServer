@@ -1,23 +1,40 @@
 #include <sys/mman.h>
+#include <sys/socket.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <string.h>
-#include "HttpServerEventHandler.h"
 #include "Util.h"
 #include "EventLoop.h"
+#include "HttpConnection.h"
+#include "HttpServer.h"
+
 using namespace std;
 
-const int HttpServerEventHandler::kLongLinkTime = 60;
+const int HttpConnection::kLongLinkTime = 60;
 pthread_once_t FileType::once_control_ = PTHREAD_ONCE_INIT;
 std::map<std::string, std::string> FileType::type_;
-HttpServerEventHandler::HttpServerEventHandler(int fd,EventLoop_WPtr event_loop):EventHandler(fd,event_loop),in_buff_(),out_buff_(),is_close_(false)
+HttpConnection::HttpConnection(int fd, HttpServer *http_server):
+	fd_(fd),
+	//event_loop_wptr_(event_loop),
+	channel_sptr_(new Channel(fd)),
+	in_buff_(),
+	out_buff_(),
+	is_close_(false),
+	http_server_(http_server)
 {
+	channel_sptr_->SetReadFunc(std::bind(&HttpConnection::ReadHandle, this));
+	channel_sptr_->SetWriteFunc(std::bind(&HttpConnection::WriteHandle, this));
     SetNonBlocking(fd);
     SetNoDelay(fd);
     Init();
 }
 
-void HttpServerEventHandler::Init()
+HttpConnection::~HttpConnection()
+{
+	if(fd_ >0)
+		close(fd_);
+}
+void HttpConnection::Init()
 {
     http_state_ = STATE_WAIT_REQUEST;
     parse_state_ = STATE_PARSE_REQUEST_LINE;
@@ -32,7 +49,7 @@ void HttpServerEventHandler::Init()
     have_body_ = false;
     //keep_alive_ = false;
 }
-void HttpServerEventHandler::WriteHandle()
+void HttpConnection::WriteHandle()
 {
  //   printf("http write\n");
     
@@ -50,7 +67,9 @@ void HttpServerEventHandler::WriteHandle()
     if((write_size = Writen(fd_,out_buff_)) <0)
     {    
         perror("writen error:");
-        ErrorHandle();
+		LOG_ERROR << "writen error";
+        //ErrorHandle();
+		exit(0);
     }
    else if(write_size < out_buff_.size())
    {
@@ -59,64 +78,40 @@ void HttpServerEventHandler::WriteHandle()
    else
    {
      //  printf("%d:http write1\n",fd_);
-        if(is_close_ || !keep_alive_)
+	   
+        if(!keep_alive_)
         {
-      //      printf("%d:http write2\n",fd_);
-            auto event_loop = eventloop_.lock();
-            if(event_loop)
-            {
-                auto sptr = shared_from_this();
-          //      printf("%d:http write2_1\n",fd_);
-                event_loop->DelEventHandler(sptr);
-           //     printf("%d:http write2_2\n",fd_);
-            }
-            
+			ActiveClose();       
         }
         else
         {
-        //    printf("http write3\n");
             out_buff_.clear();
-            DisableWrite();
+			channel_sptr_->DisableWrite();
         }
    }
  //  printf("%d:http write4\n",fd_);
   // printf("httpserver use_count:%d\n",timer_.use_count());
 }
 
-void HttpServerEventHandler::ReadHandle()
+void HttpConnection::ReadHandle()
 {
  //   printf("go read\n");
+	LOG_DEBUG << "into readhandle";
     if(http_state_ != STATE_WAIT_REQUEST)
     {
         printf("error state1:\n");
         HttpError();
         return;
     }
+	LOG_DEBUG << "begin read";
     int read_num = Readn(fd_,in_buff_);
-    if(read_num <0)
+    if(read_num == 0)
     {
-        printf("%d\n",read_num);
-        perror("http read error:");
-        ErrorHandle();
-        return;
+		PassiveClose();
+		return;
     }
-    else if(read_num == 0)
-    {
-   //     printf("%d:read 0\n",fd_);
-   //     printf("in_buff_:%s\n",in_buff_.c_str());
-        if(out_buff_.size() == 0)
-        {
-    //        printf("%d:read 0=1\n",fd_);
-            CloseHandle();
-        }
-        else
-            is_close_ = true;   
-        return;
-    }
-   // printf("go read1\n");
-   // printf("in_buff:%s\n",in_buff_.c_str());
-    //printf("%s\n",in_buff_.c_str());
-    //è§£æè¯·æ±‚è¡Œ
+    //½âÎöÇëÇóĞĞ
+	LOG_DEBUG << "begin parse request";
     http_state_ = STATE_PARSE_REQUEST;
     if(parse_state_ != STATE_PARSE_REQUEST_LINE)
     {
@@ -133,7 +128,8 @@ void HttpServerEventHandler::ReadHandle()
         HttpError();
         return;
     }
-    //è§£æé¦–éƒ¨
+    //½âÎöÊ×²¿
+	LOG_DEBUG << "begin parse header";
     parse_state_ = STATE_PARSE_HEADER;
     ParseHeader();
     if(parse_header_state_ != STATE_PARSE_Header_SUCCESS)
@@ -143,8 +139,10 @@ void HttpServerEventHandler::ReadHandle()
         return;
     }
 
+
     if(have_body_)
     {
+		LOG_DEBUG << "begin parse body";
         parse_state_ = STATE_PARSE_BODY;
         //printf("error:unsupport request\n");
         ParseBody();
@@ -155,6 +153,7 @@ void HttpServerEventHandler::ReadHandle()
             return;
         }
     }
+	LOG_DEBUG << "analysis request";
     http_state_ = STATE_ANALYSIS_REQUEST;
     AnalysisRequest();
     if(analysis_state_ != STATE_ANALYSIS_SUCCESS)
@@ -172,34 +171,34 @@ void HttpServerEventHandler::ReadHandle()
     return;
 }
 
-void HttpServerEventHandler::ErrorHandle()
-{
-    perror("Http connect socket error:");
-   // epoll_ptr_->DelEventHandler(fd_);
-    auto event_loop = eventloop_.lock();
-    if(event_loop)
-    {
-        auto sptr = shared_from_this();
-        event_loop->DelEventHandler(sptr);
-    }
-}
+//void HttpConnection::ErrorHandle()
+//{
+//    perror("Http connect socket error:");
+//   // epoll_ptr_->DelEventHandler(fd_);
+//    auto event_loop = event_loop_wptr_.lock();
+//    if(event_loop)
+//    {
+//        auto sptr = shared_from_this();
+//        event_loop->DelEventHandler(sptr);
+//    }
+//}
 
-void HttpServerEventHandler::CloseHandle()
-{
-    auto sptr = eventloop_.lock();
-    if(sptr)
-    {
-      //  printf("close event1\n");
-        auto sptr_this = shared_from_this();
-        sptr->DelEventHandler(sptr_this);
-    }
-}
-void HttpServerEventHandler::HttpError()
+//void HttpConnection::CloseHandle()
+//{
+//    auto sptr = event_loop_wptr_.lock();
+//    if(sptr)
+//    {
+//      //  printf("close event1\n");
+//        auto sptr_this = shared_from_this();
+//        sptr->DelEventHandler(sptr_this);
+//    }
+//}
+void HttpConnection::HttpError()
 {
     char send_buff[4096];
     string short_msg = " 404 Not found!";
     string body_buff, header_buff;
-    body_buff += "<html><title>å“~å‡ºé”™äº†</title>";
+    body_buff += "<html><title>°¥~³ö´íÁË</title>";
     body_buff += "<body bgcolor=\"ffffff\">";
     body_buff += short_msg;
     body_buff += "<hr><em> Web Server</em>\n</body></html>";
@@ -210,7 +209,7 @@ void HttpServerEventHandler::HttpError()
     header_buff += "Content-Length: " + std::to_string(body_buff.size()) + "\r\n";
     header_buff += "Server: LinYa's Web Server\r\n";;
     header_buff += "\r\n";
-    // é”™è¯¯å¤„ç†ä¸è€ƒè™‘writenä¸å®Œçš„æƒ…å†µ
+    // ´íÎó´¦Àí²»¿¼ÂÇwriten²»ÍêµÄÇé¿ö
     sprintf(send_buff, "%s", header_buff.c_str());
     Writen(fd_, send_buff, strlen(send_buff));
     sprintf(send_buff, "%s", body_buff.c_str());
@@ -218,10 +217,10 @@ void HttpServerEventHandler::HttpError()
     Init();
 }
 
-//è§£æè¯·æ±‚è¡Œ
-void HttpServerEventHandler::ParseRequestLine()
+//½âÎöÇëÇóĞĞ
+void HttpConnection::ParseRequestLine()
 {
-    //å–å‡ºç¬¬ä¸€è¡Œä½œä¸ºè¯·æ±‚è¡Œ
+    //È¡³öµÚÒ»ĞĞ×÷ÎªÇëÇóĞĞ
     auto pos = in_buff_.find('\n');
     if(pos == string::npos)
     {
@@ -309,7 +308,7 @@ void HttpServerEventHandler::ParseRequestLine()
     parse_request_line_state_ = STATE_PARSE_Request_SUCCESS;
 }
 
-void HttpServerEventHandler::ParseHeader()
+void HttpConnection::ParseHeader()
 {
     string::size_type key_start = 0,key_end = 0,value_start = 0,value_end = 0;
     //bool finish = false;
@@ -378,8 +377,8 @@ void HttpServerEventHandler::ParseHeader()
     }
 }
 
-//æš‚æ—¶ä¸æ¥å—ä¸»ä½“ ç›´æ¥å°†ä¸»ä½“ä¸¢å¼ƒ
-void HttpServerEventHandler::ParseBody()
+//ÔİÊ±²»½ÓÊÜÖ÷Ìå Ö±½Ó½«Ö÷Ìå¶ªÆú
+void HttpConnection::ParseBody()
 {
     int content_length = -1;
     if(header_.find("Content-length") != header_.end())
@@ -398,7 +397,7 @@ void HttpServerEventHandler::ParseBody()
     parse_body_state_ = STATE_PARSE_BODY_SUCCESS;
 }
 
-void HttpServerEventHandler::AnalysisRequest()
+void HttpConnection::AnalysisRequest()
 {
     if(method_ == METHOD_GET || method_ == METHOD_HEAD)
     {
@@ -406,17 +405,17 @@ void HttpServerEventHandler::AnalysisRequest()
         header += "HTTP/1.1 200 ok\r\n";
         if(header_.find("Connection") != header_.end())
         {
-            header += string("Connection: ") + to_string(kLongLinkTime) 
-            +string("\r\n");
-            //header += string("Connection: Close\r\n"); //æš‚æ—¶ä¸æ¥å—é•¿è¿æ¥
-            keep_alive_ = true;
-            auto eventloop = eventloop_.lock();
-            if(eventloop)
-            {
-                timer_ = std::shared_ptr<Timer>(new Timer(kLongLinkTime*1000,false,std::bind(&HttpServerEventHandler::TimeHandler,this),
-                eventloop->GetTimerManager()));
-                eventloop->AddTimer(timer_);
-            }
+			header += string("Connection: Close\r\n"); //ÔİÊ±²»½ÓÊÜ³¤Á¬½Ó
+   //         header += string("Connection: ") + to_string(kLongLinkTime) 
+   //         +string("\r\n");
+   //         keep_alive_ = true;
+   //         auto eventloop = event_loop_wptr_.lock();
+   //         if(eventloop)
+   //         {
+   //             timer_ = std::shared_ptr<Timer>(new Timer(kLongLinkTime*1000,false,std::bind(&HttpConnection::TimeHandler,this),
+   //             eventloop->GetTimerManager()));
+   //             eventloop->AddTimer(timer_);
+   //         }
          //   printf("httpserver use_count:%d\n",timer_.use_count());
         }
         else
@@ -440,7 +439,8 @@ void HttpServerEventHandler::AnalysisRequest()
             out_buff_ = string("HTTP/1.1 200 OK\r\nContent-type: text/plain\r\n")
             +"Content-Length: " + std::to_string(content.size()) +"\r\n"
             +"\r\n" +content; 
-            EnableWrite();
+            //EnableWrite();
+			WriteData();
             analysis_state_ = STATE_ANALYSIS_SUCCESS;
             return; 
         }
@@ -483,7 +483,7 @@ void HttpServerEventHandler::AnalysisRequest()
             char *src_addr = static_cast<char *>(mmapRet);
             out_buff_ += string(src_addr,src_addr+sbuf.st_size);
             munmap(mmapRet,sbuf.st_size);
-            EnableWrite();
+			WriteData();
             analysis_state_ = STATE_ANALYSIS_SUCCESS;
             return; 
         }
@@ -491,13 +491,64 @@ void HttpServerEventHandler::AnalysisRequest()
     }   
 }
 
-void HttpServerEventHandler::TimeHandler()
+void HttpConnection::TimeHandler()
 {
-   // printf("timer start\n");
-    is_close_ = true;
-    if(out_buff_.empty())
-    {
-  //      printf("close event\n");
-        CloseHandle();
-    } 
+	ActiveClose();
 }
+
+void HttpConnection::ActiveClose()
+{
+	if (connect_state_ == STATE_CONNECTING)
+	{
+		::shutdown(fd_, SHUT_WR);
+		connect_state_ = STATE_DISCONNECTING;
+	}
+	else if (connect_state_ == STATE_DISCONNECTING)
+	{
+		http_server_->DelConnection(fd_);
+		connect_state_ = STATE_DISCONNECTED;
+	}
+}
+
+void HttpConnection::PassiveClose()
+{
+	if (connect_state_ == STATE_CONNECTING)
+	{
+		connect_state_ = STATE_DISCONNECTING;
+	}
+	else if (connect_state_ == STATE_DISCONNECTING)
+	{
+		http_server_->DelConnection(fd_);
+		connect_state_ = STATE_DISCONNECTED;
+	}
+}
+
+void HttpConnection::WriteData()
+{
+	size_t write_size = 0;
+	if ((write_size = Writen(fd_, out_buff_)) <0)
+	{
+		LOG_ERROR << "writen error";
+		//ErrorHandle();
+		exit(0);
+	}
+	else if (write_size < out_buff_.size())
+	{
+		out_buff_ = out_buff_.substr(write_size);
+		channel_sptr_->EnableWrite();
+	}
+	else
+	{
+		//  printf("%d:http write1\n",fd_);
+
+		if (!keep_alive_)
+		{
+			ActiveClose();
+		}
+		else
+		{
+			out_buff_.clear();
+		}
+	}
+}
+

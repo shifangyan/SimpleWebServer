@@ -5,6 +5,8 @@
 #include <queue>
 #include "NonCopy.h"
 #include "Timer.h"
+#include "Channel.h"
+#include "EventLoop.h"
 
 typedef unsigned long long uint64;
 typedef unsigned int uint32;
@@ -14,6 +16,8 @@ class TimerManager:public NonCopy
 public:
 	//typedef unsigned int uint32;
 	//typedef unsigned long long uint64;
+	typedef Channel::Channel_SPtr Channel_SPtr;
+	typedef Channel::EventLoop_WPtr EventLoop_WPtr;
 private:
 	typedef std::weak_ptr<Timer> timer_wptr;
 	class cmp
@@ -33,13 +37,14 @@ private:
 		}
 	};
 	std::priority_queue<timer_wptr,std::vector<timer_wptr>,cmp> timer_queue_;
+	
 public:
 	void AddTimer(timer_wptr timer)
 	{
 		timer_queue_.push(timer);
 	}
 	void DoTimeEvent();
-	uint64 GetNearestTime(); //è·å–æœ€è¿‘å‘ç”Ÿäº‹ä»¶çš„æ—¶é—´ï¼Œè¿”å›æ—¶é—´ä¸ºç»å¯¹æ—¶é—´,å•ä½ms å¦‚æœè¿”å›0ï¼Œè¯´æ˜æ²¡æœ‰æ—¶é—´äº‹ä»¶
+	uint64 GetNearestTime(); //»ñÈ¡×î½ü·¢ÉúÊÂ¼şµÄÊ±¼ä£¬·µ»ØÊ±¼äÎª¾ø¶ÔÊ±¼ä,µ¥Î»ms Èç¹û·µ»Ø0£¬ËµÃ÷Ã»ÓĞÊ±¼äÊÂ¼ş
 };
 
 #endif
