@@ -8,7 +8,7 @@
 #include <queue>
 #include <memory>
 #include <signal.h>
-#include "NonCopy.h"
+#include "logger/NonCopy.h"
 #include "NotifyEvent.h"
 #include "Epoll.h"
 #include "Mutex.h"

@@ -4,7 +4,7 @@
 //此类用于实现线程互斥量
 /*************************************/
 #include <pthread.h>
-#include "NonCopy.h"
+#include "logger/NonCopy.h"
 
 class Mutex:public NonCopy
 {

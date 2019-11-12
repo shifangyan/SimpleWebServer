@@ -8,7 +8,7 @@
 #include <map>
 #include <vector>
 #include <memory>
-#include "NonCopy.h"
+#include "logger/Logger.h"
 //#include "EventHandler.h"
 #include "Channel.h"
 

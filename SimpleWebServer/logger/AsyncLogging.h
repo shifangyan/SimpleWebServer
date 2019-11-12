@@ -5,9 +5,12 @@
 #include "LogStream.h"
 #include <memory>
 #include <vector>
-#include "Thread.h"
-#include "Mutex.h"
-#include "Condition.h"
+//#include "Thread.h"
+//#include "Mutex.h"
+//#include "Condition.h"
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 class AsyncLogging
 {
@@ -36,7 +39,7 @@ public:
 		running_(true),
 		thread_(std::bind(&AsyncLogging::ThreadFunc,this)),
 		mutex_(),
-		condition_(mutex_)
+		condition_()
 	{
 		currect_buffer_->InitZero();
 		alternate_buffer_->InitZero();
@@ -45,11 +48,13 @@ public:
 	void Append(const char *log_msg, int len);
 	void Flush()
 	{
-		condition_.SignalAll();
+		//condition_.SignalAll();
+		condition_.notify_all();
 	}
 	void ThreadFunc();
 	~AsyncLogging()
 	{
+		printf("!!!!!!!!!\n");
 		running_ = false;
 		thread_.join();
 	}
@@ -61,9 +66,9 @@ private:
 	LargeBufferPtr alternate_buffer_;
 	BufferPtrVec buffer_vec_;
 	bool running_;
-	Thread thread_;
-	Mutex mutex_;
-	Condition condition_;
+	std::thread thread_;
+	std::mutex mutex_;
+	std::condition_variable condition_;
 };
 
 #endif

@@ -3,7 +3,7 @@
 
 #include <functional>
 #include <memory>
-#include "NonCopy.h"
+#include "logger/NonCopy.h"
 //#include "TimerManager.h"
 
 class TimerManager;

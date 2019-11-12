@@ -1,5 +1,7 @@
 #include "AsyncLogging.h"
-#include <fcntl.h>
+#include <sys/fcntl.h>
+#include <unistd.h>
+#include <chrono>
 
 using namespace std;
 AsyncLogging::LogFile::LogFile(std::string file_name)
@@ -43,7 +45,8 @@ void AsyncLogging::LogFile::Flush()
 }
 void AsyncLogging::Append(const char *log_msg, int len)
 {
-	MutexGuard mutex_guard(mutex_);
+	//MutexGuard mutex_guard(mutex_);
+	std::lock_guard<std::mutex> mutex_guard(mutex_);
 	if (currect_buffer_->Avail() > len) //正常情况
 	{
 		currect_buffer_->Append(log_msg, len);
@@ -60,7 +63,8 @@ void AsyncLogging::Append(const char *log_msg, int len)
 			currect_buffer_.reset(new LargeBuffer);
 		}
 		currect_buffer_->Append(log_msg, len);
-		condition_.SignalAll();
+		//condition_.SignalAll();
+		condition_.notify_all();
 	}
 }
 
@@ -71,13 +75,17 @@ void AsyncLogging::ThreadFunc() //写日志线程
 	new_buffer2->InitZero();
 	BufferPtrVec write_buffer_vec;
 	write_buffer_vec.reserve(10);
-	while (running_)
+	//必须使用do while,防止主进程结束时，日志线程直接结束
+	do
 	{
 		{
-			MutexGuard guard(mutex_); //条件变量使用前需要上锁
+			//MutexGuard guard(mutex_); //条件变量使用前需要上锁
+			std::unique_lock<std::mutex> mutex_guard(mutex_);
 			if (buffer_vec_.empty()) //基于等待时间的条件变量不使用while循环
 			{
-				condition_.TimeWait(flush_interval_); //被前端线程唤醒或者指定刷新时间到
+				//condition_.TimeWait(flush_interval_); //被前端线程唤醒或者指定刷新时间到
+				std::chrono::seconds sec(3);
+				condition_.wait_for(mutex_guard, sec);
 			}
 			buffer_vec_.push_back(std::move(currect_buffer_));
 			swap(write_buffer_vec, buffer_vec_);
@@ -113,5 +121,5 @@ void AsyncLogging::ThreadFunc() //写日志线程
 		write_buffer_vec.clear();
 		//Flush();
 		log_file_.Flush();
-	}
+	} while (running_);
 }

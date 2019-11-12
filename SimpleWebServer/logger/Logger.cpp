@@ -29,6 +29,7 @@ void Logger::LogFormat::FormatTime()
 	int micro_second = static_cast<int>(tv.tv_usec);
 	if (second != last_second)
 	{
+		last_second = second;
 		struct tm time;
 		localtime_r(&second,&time); //带r后缀的是在参数中返回结果的，不带的以返回值返回
 		//gmtime_r(&second,&time);

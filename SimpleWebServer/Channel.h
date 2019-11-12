@@ -1,11 +1,11 @@
 #ifndef CHANNEL__
 #define CHANNEL__
 
-#include "NonCopy.h"
+#include "logger/NonCopy.h"
 //#include "EventLoop.h"
 #include <memory>
 #include <functional>
-#include "Logger.h"
+#include "logger/Logger.h"
 
 class EventLoop;
 class Channel:public NonCopy,public std::enable_shared_from_this<Channel>
